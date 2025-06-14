@@ -105,7 +105,7 @@ After compilation, the executable file will be located in the `dist` directory. 
 
 ## Screenshot
 
-![Application Screenshot](screenshot.png)
+![Application Screenshot](docs/screenshot.png)
 
 ## Language Switching
 

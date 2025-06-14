@@ -7,11 +7,15 @@ import queue
 import time
 from concurrent.futures import ThreadPoolExecutor
 import webbrowser
+import json  # Added for language preference persistence
+
+# Configuration file path
+CONFIG_FILE = "config.json"
 
 # Language dictionary
 LANGUAGES = {
     "English": {
-        "title": "Batch Video Format Converter",
+        "title": "Berry Batch Video Format Converter",
         "input_folder_label": "Input Folder:",
         "output_folder_label": "Output Folder:",
         "target_format_label": "Target Format:",
@@ -61,7 +65,7 @@ LANGUAGES = {
     },
 
     "简体中文": {
-        "title": "视频格式批量转换工具",
+        "title": "花花视频格式批量转换工具",
         "input_folder_label": "输入文件夹:",
         "output_folder_label": "输出文件夹:",
         "target_format_label": "目标格式:",
@@ -73,7 +77,7 @@ LANGUAGES = {
         "progress_label": "进度:",
         "file_stats_label": "文件统计:",
         "log_label": "转换日志:",
-        "github_text": "项目GitHub",
+        "github_text": "项目GitHub主页",
         "browse_button": "浏览...",
         "auto_set_button": "自动设置",
         "error_no_input_folder": "错误",
@@ -109,25 +113,54 @@ LANGUAGES = {
         "conversion_finished_msg": "转换完成！\n成功: {}\n失败: {}",
         "set_output_folder": "自动设置输出文件夹为: {}",
     }
-
 }
 
 
 class VideoConverter:
     def __init__(self, root):
         self.root = root
-        self.language = tk.StringVar(value="English")  # Default language is English
+        # Load saved language preference or default to English
+        self.language = tk.StringVar(value=self.load_language_preference())
         self.update_ui()
+        
+        # Save preferences when the application is closed
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def load_language_preference(self):
+        """Load saved language preference from config file"""
+        try:
+            if os.path.exists(CONFIG_FILE):
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get("language", "English")
+        except Exception as e:
+            print(f"Failed to load config: {e}")
+        return "English"  # Default to English if config is missing or invalid
+
+    def save_language_preference(self):
+        """Save current language preference to config file"""
+        try:
+            config = {"language": self.language.get()}
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"Failed to save config: {e}")
+
+    def on_closing(self):
+        """Handle application close event, save preferences"""
+        self.save_language_preference()
+        self.root.destroy()
 
     def update_ui(self):
+        """Update UI elements based on current language setting"""
         lang = self.language.get()
         self.root.title(LANGUAGES[lang]["title"])
         self.root.geometry("700x550")
         self.root.resizable(True, True)
         self.root.configure(bg="#f0f0f0")
 
-        # Set Chinese font
-        self.font = ("SimHei", 10)
+        # Set font based on language
+        self.font = ("SimHei", 10) if lang == "简体中文" else ("TkDefaultFont", 10)
 
         # Create variables
         self.input_folder = tk.StringVar()
@@ -140,15 +173,16 @@ class VideoConverter:
         self.processed_files = tk.IntVar(value=0)
         self.successful_files = tk.IntVar(value=0)
         self.failed_files = tk.IntVar(value=0)
-        self.target_format = tk.StringVar(value="mp4")  # Target format
+        self.target_format = tk.StringVar(value="mp4")
 
-        # FFmpeg path is fixed as a relative path
+        # FFmpeg path (relative)
         self.ffmpeg_path = os.path.abspath("./bin/ffmpeg.exe")
 
         # Create the UI
         self.create_widgets()
 
     def create_widgets(self):
+        """Create all UI widgets with proper indentation"""
         # Clear previous widgets
         for widget in self.root.winfo_children():
             widget.destroy()
@@ -163,7 +197,16 @@ class VideoConverter:
         self.style = ttk.Style()
         self.style.configure('TButton', font=self.font)
         self.style.configure('TLabel', font=self.font)
-        self.style.configure('Accent.TButton', font=self.font, foreground='white', background='#4a86e8')
+        
+        # Configure Accent.TButton with blue background and black text
+        self.style.configure('Accent.TButton', 
+                             font=self.font, 
+                             foreground='black',  # Black text
+                             background='#1e88e5',  # Medium blue background
+                             bordercolor='#1976d2',
+                             focuscolor='#1976d2',
+                             highlightcolor='#1976d2'
+                             )
 
         # Input folder selection
         ttk.Label(main_frame, text=LANGUAGES[lang]["input_folder_label"]).grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -185,7 +228,7 @@ class VideoConverter:
             width=10
         )
         format_combo.grid(row=2, column=1, sticky=tk.W, padx=5, pady=5)
-        format_combo.set("mp4")  # Default selection is MP4
+        format_combo.set("mp4")  # Default selection
 
         # Options
         options_frame = ttk.Frame(main_frame)
@@ -199,8 +242,8 @@ class VideoConverter:
         thread_combo = ttk.Combobox(main_frame, textvariable=self.thread_count, values=[1, 2, 3, 4, 5, 6, 7, 8], width=5)
         thread_combo.grid(row=4, column=1, sticky=tk.W, padx=5, pady=5)
 
-        # Conversion button
-        ttk.Button(main_frame, text=LANGUAGES[lang]["start_conversion"], command=self.start_conversion, style='Accent.TButton').grid(row=5, column=0, columnspan=3, pady=10)
+        # Conversion button with increased width
+        ttk.Button(main_frame, text=LANGUAGES[lang]["start_conversion"], command=self.start_conversion, style='Accent.TButton').grid(row=5, column=0, columnspan=10, pady=20)
 
         # Status information
         ttk.Label(main_frame, text=LANGUAGES[lang]["status_label"]).grid(row=6, column=0, sticky=tk.W, pady=5)
@@ -236,13 +279,13 @@ class VideoConverter:
             main_frame,
             textvariable=self.language,
             values=["简体中文", "English"],
-            width=5
+            width=10
         )
         lang_combo.grid(row=10, column=0, sticky=tk.W, padx=5, pady=5)
         lang_combo.set(self.language.get())
         lang_combo.bind("<<ComboboxSelected>>", self.on_language_change)
 
-        # Add author's GitHub link
+        # GitHub link
         github_text = LANGUAGES[lang]["github_text"]
         github_link = "https://github.com/Berry-Wahlberg/video-converter"
 
@@ -250,40 +293,40 @@ class VideoConverter:
         link_label.grid(row=10, column=1, columnspan=3, pady=10)
         link_label.bind("<Button-1>", lambda e: webbrowser.open_new(github_link))
 
-    def on_language_change(self, event):
+    def on_language_change(self, event=None):
+        """Handle language change event, update UI and save preference"""
         self.update_ui()
+        self.save_language_preference()
 
     def browse_input_folder(self):
+        """Open dialog to select input folder"""
         folder = filedialog.askdirectory(title="Select Input Folder")
         if folder:
-            # Normalize the path, automatically handle slashes (convert to backslashes on Windows)
             folder = os.path.normpath(folder)
             self.input_folder.set(folder)
-            # Automatically set the output folder
             self.auto_set_output_folder()
 
     def browse_output_folder(self):
+        """Open dialog to select output folder"""
         folder = filedialog.askdirectory(title="Select Output Folder")
         if folder:
-            # Normalize the path to ensure backslashes are used on Windows
             folder = os.path.normpath(folder)
             self.output_folder.set(folder)
 
     def auto_set_output_folder(self):
-        """Automatically set the output folder to input_folder/mp4"""
+        """Automatically set output folder to input_folder/mp4"""
         input_folder = self.input_folder.get()
         lang = self.language.get()
         if input_folder:
-            # Use os.path.join to ensure the correct path separator
             output_folder = os.path.join(input_folder, "mp4")
-            # Normalize the path to ensure backslashes are used on Windows
             output_folder = os.path.normpath(output_folder)
             self.output_folder.set(output_folder)
             self.log(LANGUAGES[lang]["set_output_folder"].format(output_folder))
 
     def start_conversion(self):
+        """Start the video conversion process"""
         lang = self.language.get()
-        # Check the input folder
+        # Input validation
         input_folder = self.input_folder.get()
         if not input_folder:
             messagebox.showerror(LANGUAGES[lang]["error_no_input_folder"], LANGUAGES[lang]["error_no_input_folder_msg"])
@@ -293,10 +336,9 @@ class VideoConverter:
             messagebox.showerror(LANGUAGES[lang]["error_invalid_input_folder"], LANGUAGES[lang]["error_invalid_input_folder_msg"] + input_folder)
             return
 
-        # Check the output folder
+        # Output folder validation
         output_folder = self.output_folder.get()
         if not output_folder:
-            # Automatically set the output folder
             self.auto_set_output_folder()
             output_folder = self.output_folder.get()
 
@@ -308,31 +350,29 @@ class VideoConverter:
                 messagebox.showerror(LANGUAGES[lang]["error_create_output_folder"], LANGUAGES[lang]["error_create_output_folder_msg"] + output_folder + "\n" + str(e))
                 return
 
-        # Get the target format
-        target_format = self.target_format.get()
-
-        # Check if FFmpeg is executable
+        # Check FFmpeg availability
         try:
             subprocess.run([self.ffmpeg_path, '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         except (subprocess.SubprocessError, FileNotFoundError):
             messagebox.showerror(LANGUAGES[lang]["error_ffmpeg"], LANGUAGES[lang]["error_ffmpeg_msg"] + self.ffmpeg_path + "\nPlease ensure ffmpeg.exe exists in the bin directory")
             return
 
-        # Reset the counters
+        # Reset counters
         self.total_files.set(0)
         self.processed_files.set(0)
         self.successful_files.set(0)
         self.failed_files.set(0)
 
-        # Clear the log
+        # Clear log
         self.log_text.delete(1.0, tk.END)
 
-        # Perform the conversion in a new thread to avoid UI freezing
-        thread = threading.Thread(target=self.perform_conversion, args=(target_format,))
+        # Start conversion in a new thread
+        thread = threading.Thread(target=self.perform_conversion, args=(self.target_format.get(),))
         thread.daemon = True
         thread.start()
 
     def perform_conversion(self, target_format):
+        """Perform the actual video conversion process"""
         lang = self.language.get()
         try:
             self.status.set(LANGUAGES[lang]["conversion_start"])
@@ -343,7 +383,7 @@ class VideoConverter:
             include_subfolders = self.include_subfolders.get()
             thread_count = self.thread_count.get()
 
-            # Find all supported video files
+            # Find video files
             video_files = self.find_video_files(input_folder, include_subfolders)
 
             self.total_files.set(len(video_files))
@@ -358,21 +398,20 @@ class VideoConverter:
             self.log(LANGUAGES[lang]["target_format"].format(target_format.upper()))
             self.log(LANGUAGES[lang]["output_directory"].format(output_folder))
 
-            # Create a task queue
+            # Create task queue
             task_queue = queue.Queue()
 
-            # Add all video files to the task queue
+            # Add all files to the queue
             for video_file in video_files:
                 task_queue.put((video_file, input_folder, output_folder))
 
-            # Create a result queue
+            # Create result queue
             result_queue = queue.Queue()
 
-            # Create and start worker threads
+            # Start worker threads
             self.status.set(LANGUAGES[lang]["converting"])
 
             with ThreadPoolExecutor(max_workers=thread_count) as executor:
-                # Submit all conversion tasks
                 futures = []
                 for _ in range(thread_count):
                     future = executor.submit(
@@ -384,7 +423,7 @@ class VideoConverter:
                     )
                     futures.append(future)
 
-                # Process the results
+                # Process results
                 while self.processed_files.get() < self.total_files.get():
                     if not result_queue.empty():
                         success = result_queue.get()
@@ -394,7 +433,7 @@ class VideoConverter:
                             self.failed_files.set(self.failed_files.get() + 1)
                         self.processed_files.set(self.processed_files.get() + 1)
 
-                    # Update the progress bar
+                    # Update progress bar
                     progress = (self.processed_files.get() / self.total_files.get()) * 100
                     self.root.update_idletasks()
 
@@ -415,18 +454,17 @@ class VideoConverter:
             messagebox.showerror(LANGUAGES[lang]["conversion_failed"], LANGUAGES[lang]["conversion_failed_msg"] + str(e))
 
     def worker_thread(self, task_queue, result_queue, ffmpeg_path, target_format):
-        """Worker thread function to get tasks from the queue and perform conversions"""
+        """Worker thread to process video conversion tasks"""
         lang = self.language.get()
         while True:
             try:
-                # Get a task, timeout after 1 second
+                # Get task with timeout
                 video_file, input_folder, output_folder = task_queue.get(timeout=1)
             except queue.Empty:
-                # The queue is empty, exit the thread
                 break
 
             try:
-                # Perform the conversion
+                # Perform conversion
                 self.log(LANGUAGES[lang]["file_conversion_start"].format(os.path.basename(video_file)))
                 success = self.convert_video(
                     video_file,
@@ -437,75 +475,64 @@ class VideoConverter:
                     output_folder
                 )
 
-                # Put the result into the result queue
+                # Report result
                 result_queue.put(success)
 
             except Exception as e:
                 self.log(LANGUAGES[lang]["file_conversion_error"].format(os.path.basename(video_file), str(e)))
                 result_queue.put(False)
             finally:
-                # Mark the task as done
+                # Mark task as done
                 task_queue.task_done()
 
     def convert_video(self, video_file, ffmpeg_path, overwrite=False, target_format="mp4", input_folder=None, output_folder=None):
-        """
-        Convert a single video file to the specified format
-        :param video_file: Path to the video file
-        :param ffmpeg_path: Path to the FFmpeg executable
-        :param overwrite: Whether to overwrite existing files
-        :param target_format: Target format
-        :param input_folder: Path to the input folder
-        :param output_folder: Path to the output folder
-        :return: True if the conversion is successful, False otherwise
-        """
+        """Convert a single video file using FFmpeg"""
         lang = self.language.get()
-        # Ensure the file exists
+        # Check if file exists
         if not os.path.isfile(video_file):
             self.log(LANGUAGES[lang]["file_not_found"].format(video_file))
             return False
 
-        # Build the output file name and path
+        # Build output file path
         if input_folder and output_folder:
-            # Calculate the relative path and create the same directory structure in the output folder
+            # Preserve directory structure
             rel_path = os.path.relpath(os.path.dirname(video_file), input_folder)
             output_subfolder = os.path.join(output_folder, rel_path)
-            # Normalize the path to ensure backslashes are used on Windows
             output_subfolder = os.path.normpath(output_subfolder)
             os.makedirs(output_subfolder, exist_ok=True)
 
             base_name = os.path.basename(os.path.splitext(video_file)[0])
             output_file = os.path.join(output_subfolder, f"{base_name}.{target_format}")
-            # Normalize the output file path
             output_file = os.path.normpath(output_file)
         else:
-            # If no input/output folders are provided, use the original path
+            # Use original path if no input/output folders provided
             base_name, _ = os.path.splitext(video_file)
             output_file = f"{base_name}.{target_format}"
 
-        # Check if the output file already exists
+        # Check if output file exists
         if os.path.exists(output_file):
             if not overwrite:
                 self.log(LANGUAGES[lang]["file_conversion_skip"].format(output_file))
                 return True
 
-        # Build the FFmpeg command
+        # Build FFmpeg command
         cmd = [
             ffmpeg_path,
             '-i', video_file,
-            '-c', 'copy',  # Directly copy the audio and video streams without re-encoding
-            '-y' if overwrite else '-n',  # Whether to overwrite existing files
+            '-c', 'copy',  # Copy streams without re-encoding
+            '-y' if overwrite else '-n',  # Overwrite existing files
             output_file
         ]
 
         try:
-            # Execute the command, specify UTF-8 encoding
+            # Execute command
             result = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                encoding='utf-8',  # Explicitly specify UTF-8 encoding
-                errors='replace',  # Replace undecodable characters
+                encoding='utf-8',
+                errors='replace',
                 check=True
             )
             self.log(LANGUAGES[lang]["file_conversion_success"].format(output_file))
@@ -518,12 +545,7 @@ class VideoConverter:
             return False
 
     def find_video_files(self, directory, recursive=True):
-        """
-        Find all supported video files in the directory
-        :param directory: Directory to search
-        :param recursive: Whether to search subdirectories recursively
-        :return: List of video files
-        """
+        """Find all supported video files in the directory"""
         if not os.path.isdir(directory):
             raise ValueError(f"Error: Directory does not exist - {directory}")
 
@@ -550,12 +572,13 @@ class VideoConverter:
         return video_files
 
     def log(self, message):
-        # Update the log in the UI thread
+        """Add message to the log display"""
         self.root.after(0, lambda: self._append_to_log(message))
 
     def _append_to_log(self, message):
+        """Helper method to append message to log text widget"""
         self.log_text.insert(tk.END, message + "\n")
-        self.log_text.see(tk.END)  # Scroll to the bottom
+        self.log_text.see(tk.END)  # Scroll to bottom
 
 
 if __name__ == "__main__":
