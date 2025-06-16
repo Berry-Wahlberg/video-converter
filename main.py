@@ -3,12 +3,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import json
 import webbrowser
-from video_converter import VideoConverterTab
-from audio_converter import AudioConverterTab
-from image_converter import ImageConverterTab
+from video_tool import VideoConverterTab
+from audio_tool import AudioConverterTab
+from image_tool import ImageConverterTab
 
 # Configuration file path
 CONFIG_FILE = "config.json"
+
+LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
 
 # Language dictionary
 LANGUAGES = {
@@ -21,22 +23,31 @@ LANGUAGES = {
         "settings_saved_msg": "Your settings have been saved successfully.",
         "tab_video": "Video",
         "tab_audio": "Audio (Under Development)",
-        "tab_image": "Image (Under Development)",
+        "tab_image": "Image ",
         "tab_settings": "Settings",
-    },
-    "简体中文": {
-        "title": "花花视频格式批量转换工具",
-        "github_text": "项目GitHub主页",
-        "language_label": "应用程序语言:",
-        "save_settings": "保存设置",
-        "settings_saved": "设置已保存",
-        "settings_saved_msg": "您的设置已成功保存。",
-        "tab_video": "视频",
-        "tab_audio": "音频 (开发中)",
-        "tab_image": "图像 (开发中)",
-        "tab_settings": "设置",
     }
 }
+
+# Language judgment logic module [start]
+import os 
+def load_language_files():
+    try:
+        if os.path.exists(LOCALES_DIR):
+            for filename in os.listdir(LOCALES_DIR):
+                if filename.endswith(".json"):
+                    lang_code = os.path.splitext(filename)[0]
+                    try:
+                        with open(os.path.join(LOCALES_DIR, filename), 'r', encoding='utf-8') as f:
+                            lang_data = json.load(f)
+                            LANGUAGES[lang_code] = lang_data
+                    except Exception as e:
+                        print(f"Failed to load {filename}: {e}")
+    except Exception as e:
+        print(f"Failed to access locales directory: {e}")
+
+load_language_files()
+
+# Language judgment logic module [End]
 
 
 class MainApp:
@@ -52,7 +63,7 @@ class MainApp:
         # Create tabs
         self.video_tab = VideoConverterTab(self.notebook, self.language)
         self.audio_tab = AudioConverterTab(self.notebook)
-        self.image_tab = ImageConverterTab(self.notebook)
+        self.image_tab = ImageConverterTab(self.notebook, self.language)
         self.setting_tab = ttk.Frame(self.notebook)
 
         # Add tabs to the notebook with initial labels
@@ -73,8 +84,9 @@ class MainApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def get_tab_text(self, key):
-        """Get tab text based on current language"""
-        return LANGUAGES[self.language.get()][key]
+        """Get tab text based on current language with fallback to English"""
+        lang = self.language.get()
+        return LANGUAGES.get(lang, LANGUAGES['English']).get(key, LANGUAGES['English'][key])
 
     def update_tab_labels(self):
         """Update tab labels when language changes"""
@@ -109,9 +121,9 @@ class MainApp:
         self.root.destroy()
 
     def update_ui(self):
-        """Update UI elements based on current language setting"""
+        """Update UI elements based on current language setting with fallback to English"""
         lang = self.language.get()
-        self.root.title(LANGUAGES[lang]["title"])
+        self.root.title(LANGUAGES.get(lang, LANGUAGES['English']).get('title', LANGUAGES['English']['title']))
         self.root.geometry("700x550")
         self.root.resizable(True, True)
         self.root.configure(bg="#f0f0f0")
@@ -120,7 +132,7 @@ class MainApp:
         self.font = ("SimHei", 10) if lang == "简体中文" else ("TkDefaultFont", 10)
 
         # GitHub link
-        github_text = LANGUAGES[lang]["github_text"]
+        github_text = LANGUAGES.get(lang, LANGUAGES['English']).get('github_text', LANGUAGES['English']['github_text'])
         github_link = "https://github.com/Berry-Wahlberg/video-converter"
 
         link_label = tk.Label(self.root, text=github_text, fg="blue", cursor="hand2", font=self.font)
@@ -141,11 +153,11 @@ class MainApp:
         settings_frame.pack(fill=tk.BOTH, expand=True)
 
         # Language selection
-        ttk.Label(settings_frame, text=LANGUAGES[lang]["language_label"], font=self.font).grid(row=0, column=0, sticky=tk.W, pady=10)
+        ttk.Label(settings_frame, text=LANGUAGES.get(lang, LANGUAGES['English']).get('language_label', LANGUAGES['English']['language_label']), font=self.font).grid(row=0, column=0, sticky=tk.W, pady=10)
         lang_combo = ttk.Combobox(
             settings_frame,
             textvariable=self.language,
-            values=["简体中文", "English"],
+            values=list(LANGUAGES.keys()),
             width=15,
             state="readonly"
         )
@@ -156,7 +168,7 @@ class MainApp:
         # Save settings button
         save_button = ttk.Button(
             settings_frame,
-            text=LANGUAGES[lang]["save_settings"],
+            text=LANGUAGES.get(lang, LANGUAGES['English']).get('save_settings', LANGUAGES['English']['save_settings']),
             command=self.save_settings,
             style='Accent.TButton'
         )
@@ -168,10 +180,13 @@ class MainApp:
         self.save_language_preference()
 
     def save_settings(self):
-        """Save all settings and show confirmation"""
+        """Save all settings and show confirmation with fallback to English"""
         lang = self.language.get()
         self.save_language_preference()
-        messagebox.showinfo(LANGUAGES[lang]["settings_saved"], LANGUAGES[lang]["settings_saved_msg"])
+        messagebox.showinfo(
+            LANGUAGES.get(lang, LANGUAGES['English']).get('settings_saved', LANGUAGES['English']['settings_saved']),
+            LANGUAGES.get(lang, LANGUAGES['English']).get('settings_saved_msg', LANGUAGES['English']['settings_saved_msg'])
+        )
 
 
 if __name__ == "__main__":
