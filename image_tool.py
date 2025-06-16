@@ -215,9 +215,14 @@ class ImageConverterTab(ttk.Frame):
                 file_name = os.path.basename(input_file)
                 output_file = os.path.join(output_folder, os.path.splitext(file_name)[0] + f".{output_format}")
 
-                # Construct the ImageMagick command
+                # Check ImageMagick path
+                magick_path = os.path.join(os.path.dirname(__file__), 'bin', 'imagemagick', 'magick.exe')
+                if not os.path.exists(magick_path):
+                    raise FileNotFoundError(f"ImageMagick not found at {magick_path}")
+
+                # Constructing ImageMagick commands
                 command = [
-                    "magick",
+                    magick_path,
                     "convert",
                     input_file
                 ]
